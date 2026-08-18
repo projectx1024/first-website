@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>π Market — Pi Network Marketplace</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Pi Network JS SDK — required in every Pi app's <head>. -->
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          pipurple: {
+            50: '#f7f0f7',
+            100: '#ecdcec',
+            300: '#a4569f',
+            600: '#611763',
+            700: '#4A154B',
+            900: '#33103a',
+          },
+          pigold: {
+            300: '#f0c987',
+            500: '#E5A93C',
+            600: '#c8912e',
+          }
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"', 'sans-serif'],
+          body: ['"Inter"', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+  .font-display { font-family: 'Space Grotesk', sans-serif; }
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+
+  .pill-scroll { overflow-x: auto; scroll-snap-type: x proximity; }
+  .pill { scroll-snap-align: start; }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .pi-watermark::before {
+    content: "π";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.25rem;
+    font-weight: 700;
+    color: rgba(74, 21, 75, 0.08);
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .nav-btn svg { transition: transform 0.15s ease; }
+  .nav-btn.active svg { transform: translateY(-1px); }
+
+  /* Modal */
+  #productModal { transition: opacity 0.2s ease; }
+  #modalPanel { transition: transform 0.25s ease; }
+  #productModal.hidden #modalPanel { transform: translateY(100%); }
+  #productModal:not(.hidden) #modalPanel { transform: translateY(0); }
+
+  #toast { transition: opacity 0.2s ease, transform 0.2s ease; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body class="bg-white text-pipurple-900 font-body pb-20">
+
+<!-- ===== HEADER ===== -->
+<header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-pipurple-100">
+  <div class="max-w-lg mx-auto px-4 pt-4 pb-3">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <div class="flex items-center gap-1.5">
+        <span class="font-display font-bold text-2xl text-pipurple-700">π</span>
+        <span class="font-display font-semibold text-lg tracking-tight text-pipurple-900">Market</span>
+      </div>
+      <button aria-label="Profile" class="w-9 h-9 rounded-full bg-pipurple-700 ring-2 ring-pigold-500 ring-offset-2 flex items-center justify-center text-white font-display font-semibold text-sm">
+        MK
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div class="relative mb-3">
+      <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-pipurple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+      </svg>
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search the marketplace"
+        class="w-full bg-pipurple-50 border border-transparent focus:border-pigold-500 focus:bg-white focus:ring-2 focus:ring-pigold-300 rounded-full pl-10 pr-4 py-2.5 text-sm text-pipurple-900 placeholder:text-pipurple-300 outline-none transition"
+      />
+    </div>
+
+    <!-- Category pills -->
+    <div id="pillRow" class="pill-scroll flex gap-2 -mx-4 px-4">
+      <button data-cat="All" class="pill active-pill pill shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-pipurple-700 text-white transition">All</button>
+      <button data-cat="Electronics" class="pill shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border border-pipurple-200 text-pipurple-700 transition">Electronics</button>
+      <button data-cat="Services" class="pill shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border border-pipurple-200 text-pipurple-700 transition">Services</button>
+      <button data-cat="Digital" class="pill shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border border-pipurple-200 text-pipurple-700 transition">Digital</button>
+      <button data-cat="Home" class="pill shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border border-pipurple-200 text-pipurple-700 transition">Home</button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="max-w-lg mx-auto">
+
+  <!-- PAGE: HOME -->
+  <section id="page-home" class="page active px-4 pt-4">
+    <p id="resultCount" class="text-xs font-medium text-pipurple-300 mb-3 uppercase tracking-wide"></p>
+    <div id="productGrid" class="grid grid-cols-2 gap-3"></div>
+    <p id="emptyState" class="hidden text-center text-sm text-pipurple-300 py-16">
+      Nothing matches yet. Try another search or category.
+    </p>
+  </section>
+
+  <!-- PAGE: SELL -->
+  <section id="page-sell" class="page px-4 pt-6">
+    <h1 class="font-display font-semibold text-xl mb-1">List an item</h1>
+    <p class="text-sm text-pipurple-300 mb-5">Set a price in Pi and reach buyers across the network.</p>
+
+    <form id="sellForm" novalidate class="space-y-4">
+      <div>
+        <label for="sellTitle" class="block text-xs font-semibold text-pipurple-700 mb-1.5 uppercase tracking-wide">Product title</label>
+        <input
+          type="text"
+          id="sellTitle"
+          placeholder="e.g. Wireless keyboard"
+          class="w-full border border-pipurple-100 focus:border-pigold-500 focus:ring-2 focus:ring-pigold-300 rounded-xl px-3.5 py-2.5 text-sm outline-none transition"
+        />
+        <p id="sellTitleError" class="hidden text-xs text-red-600 mt-1.5">Title must be at least 5 characters.</p>
+      </div>
+
+      <div>
+        <label for="sellCategory" class="block text-xs font-semibold text-pipurple-700 mb-1.5 uppercase tracking-wide">Category</label>
+        <select id="sellCategory" class="w-full border border-pipurple-100 focus:border-pigold-500 focus:ring-2 focus:ring-pigold-300 rounded-xl px-3.5 py-2.5 text-sm outline-none transition bg-white">
+          <option value="Electronics">Electronics</option>
+          <option value="Services">Services</option>
+          <option value="Digital">Digital</option>
+          <option value="Home">Home</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="sellPrice" class="block text-xs font-semibold text-pipurple-700 mb-1.5 uppercase tracking-wide">Price in Pi</label>
+        <div class="relative">
+          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-pigold-500 text-pipurple-900 font-display font-bold text-xs flex items-center justify-center pointer-events-none">π</span>
+          <input
+            type="number"
+            id="sellPrice"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            class="w-full border border-pipurple-100 focus:border-pigold-500 focus:ring-2 focus:ring-pigold-300 rounded-xl pl-12 pr-3.5 py-2.5 text-sm outline-none transition"
+          />
+        </div>
+        <p id="sellPriceError" class="hidden text-xs text-red-600 mt-1.5">Enter a price greater than 0.</p>
+      </div>
+
+      <div>
+        <label for="sellDescription" class="block text-xs font-semibold text-pipurple-700 mb-1.5 uppercase tracking-wide">Description</label>
+        <textarea
+          id="sellDescription"
+          rows="4"
+          placeholder="Describe the item's condition and any details buyers should know…"
+          class="w-full border border-pipurple-100 focus:border-pigold-500 focus:ring-2 focus:ring-pigold-300 rounded-xl px-3.5 py-2.5 text-sm outline-none transition resize-none"
+        ></textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-pipurple-700 mb-1.5 uppercase tracking-wide">Photo</label>
+        <input type="file" id="sellImage" accept="image/*" class="hidden" />
+        <button
+          type="button"
+          id="sellImageTrigger"
+          class="w-full border-2 border-dashed border-pipurple-100 hover:border-pigold-500 rounded-xl py-8 text-center text-pipurple-300 text-sm transition flex flex-col items-center justify-center gap-2"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m4 17 5-5 3 3 4-4 4 4"/>
+          </svg>
+          <span>Tap to add a photo</span>
+        </button>
+      </div>
+
+      <button type="submit" class="w-full bg-pipurple-700 hover:bg-pipurple-600 text-white font-semibold rounded-xl py-3 text-sm transition">
+        Publish listing
+      </button>
+    </form>
+  </section>
+
+  <!-- PAGE: ORDERS -->
+  <section id="page-orders" class="page px-4 pt-6">
+    <h1 class="font-display font-semibold text-xl mb-4">My orders</h1>
+    <div class="space-y-3" id="ordersList"></div>
+  </section>
+
+  <!-- PAGE: WALLET / CART -->
+  <section id="page-wallet" class="page px-4 pt-6">
+    <h1 class="font-display font-semibold text-xl mb-4">Wallet</h1>
+    <div class="bg-pipurple-700 rounded-2xl p-5 text-white relative overflow-hidden mb-5">
+      <div class="absolute -right-4 -bottom-6 font-display font-bold text-8xl text-white/10">π</div>
+      <p class="text-xs uppercase tracking-wide text-pigold-300 mb-1.5 relative">Available balance</p>
+      <p id="walletBalance" class="font-display font-bold text-4xl relative">π 1,284.60</p>
+      <p class="text-xs text-white/60 mt-1 relative">≈ market value updates live</p>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <button class="bg-pigold-500 hover:bg-pigold-600 text-pipurple-900 font-semibold rounded-xl py-3 text-sm transition">Send</button>
+      <button class="border border-pipurple-200 hover:bg-pipurple-50 text-pipurple-700 font-semibold rounded-xl py-3 text-sm transition">Receive</button>
+    </div>
+
+    <!-- Cart -->
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display font-semibold text-sm text-pipurple-300 uppercase tracking-wide">Your cart</h2>
+      <span id="cartCountLabel" class="text-xs text-pipurple-300"></span>
+    </div>
+    <div id="cartList" class="space-y-2 mb-3"></div>
+    <p id="cartEmpty" class="hidden text-sm text-pipurple-300 border border-dashed border-pipurple-100 rounded-xl py-6 text-center mb-3">
+      Your cart is empty. Tap a product to add one.
+    </p>
+    <div id="cartSummary" class="hidden border border-pipurple-100 rounded-xl p-4 mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm text-pipurple-300">Total</span>
+        <span id="cartTotal" class="font-display font-bold text-lg text-pipurple-900">π 0.00</span>
+      </div>
+      <button id="checkoutBtn" class="w-full bg-pipurple-700 hover:bg-pipurple-600 text-white font-semibold rounded-xl py-3 text-sm transition">
+        Checkout
+      </button>
+    </div>
+
+    <h2 class="font-display font-semibold text-sm text-pipurple-300 uppercase tracking-wide mb-3">Recent activity</h2>
+    <div class="space-y-2" id="walletActivity"></div>
+  </section>
+
+</main>
+
+<!-- ===== BOTTOM NAV ===== -->
+<nav class="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-pipurple-100">
+  <div class="max-w-lg mx-auto grid grid-cols-4">
+    <button data-page="home" class="nav-btn active flex flex-col items-center gap-1 py-2.5 text-pipurple-700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/>
+      </svg>
+      <span class="text-[11px] font-medium">Home</span>
+    </button>
+    <button data-page="sell" class="nav-btn flex flex-col items-center gap-1 py-2.5 text-pipurple-300">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>
+      </svg>
+      <span class="text-[11px] font-medium">Sell Item</span>
+    </button>
+    <button data-page="orders" class="nav-btn flex flex-col items-center gap-1 py-2.5 text-pipurple-300">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/>
+      </svg>
+      <span class="text-[11px] font-medium">My Orders</span>
+    </button>
+    <button data-page="wallet" class="nav-btn relative flex flex-col items-center gap-1 py-2.5 text-pipurple-300">
+      <span class="relative">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16.5" cy="14.5" r="1"/>
+        </svg>
+        <span id="cartBadge" class="hidden absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-pigold-500 text-pipurple-900 text-[10px] font-bold flex items-center justify-center leading-none">0</span>
+      </span>
+      <span class="text-[11px] font-medium">Wallet</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ===== PRODUCT DETAIL MODAL ===== -->
+<div id="productModal" class="hidden fixed inset-0 z-40 flex items-end justify-center">
+  <div id="modalBackdrop" class="absolute inset-0 bg-pipurple-900/50 backdrop-blur-sm"></div>
+  <div id="modalPanel" class="relative w-full max-w-lg bg-white rounded-t-3xl max-h-[88vh] overflow-y-auto">
+    <div class="sticky top-0 flex justify-end p-3 bg-white/90 backdrop-blur">
+      <button id="modalClose" aria-label="Close" class="w-8 h-8 rounded-full bg-pipurple-50 flex items-center justify-center text-pipurple-700">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="px-5 pb-6 -mt-8">
+      <div class="relative aspect-[4/3] rounded-2xl overflow-hidden bg-pipurple-50 mb-4">
+        <img id="modalImage" src="" alt="" class="w-full h-full object-cover" />
+        <div id="modalImageFallback" class="hidden absolute inset-0 pi-watermark bg-gradient-to-br from-pipurple-50 to-pigold-300/10"></div>
+      </div>
+      <p id="modalCategory" class="text-[11px] font-semibold uppercase tracking-wide text-pigold-600 mb-1"></p>
+      <h2 id="modalTitle" class="font-display font-semibold text-lg text-pipurple-900 mb-2 leading-snug"></h2>
+      <div class="flex items-center gap-2 mb-4">
+        <span id="modalSellerAvatar" class="w-6 h-6 rounded-full bg-pipurple-700 text-white text-[10px] font-display font-semibold flex items-center justify-center shrink-0"></span>
+        <span id="modalSeller" class="text-sm text-pipurple-700 font-medium"></span>
+      </div>
+      <p id="modalDescription" class="text-sm text-pipurple-700/80 leading-relaxed mb-5"></p>
+      <div class="flex items-center gap-1.5 mb-5">
+        <span class="w-6 h-6 rounded-full bg-pigold-500 text-pipurple-900 font-display font-bold text-xs flex items-center justify-center">π</span>
+        <span id="modalPrice" class="font-display font-bold text-2xl text-pipurple-900"></span>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button id="modalAddToCart" class="border-2 border-pipurple-700 text-pipurple-700 font-semibold rounded-xl py-3 text-sm transition hover:bg-pipurple-50">
+          Add to Cart
+        </button>
+        <button id="modalBuyNow" class="bg-pipurple-700 hover:bg-pipurple-600 text-white font-semibold rounded-xl py-3 text-sm transition">
+          Buy Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-pipurple-900 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-lg opacity-0">
+</div>
+
+<!-- ===== PI SDK ALERT MODAL ===== -->
+<div id="sdkAlertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-6">
+  <div id="sdkAlertBackdrop" class="absolute inset-0 bg-pipurple-900/60 backdrop-blur-sm"></div>
+  <div class="relative w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl">
+    <div id="sdkAlertIcon" class="w-10 h-10 rounded-full flex items-center justify-center mb-3"></div>
+    <h3 id="sdkAlertTitle" class="font-display font-semibold text-base text-pipurple-900 mb-1"></h3>
+    <p id="sdkAlertMessage" class="text-sm text-pipurple-700/80 mb-4 leading-relaxed"></p>
+    <button id="sdkAlertClose" class="w-full bg-pipurple-700 hover:bg-pipurple-600 text-white font-semibold rounded-xl py-2.5 text-sm transition">
+      OK
+    </button>
+  </div>
+</div>
+
+<script>
+  // =====================================================================
+  // 1. MOCK MARKETPLACE DATA
+  // =====================================================================
+  const products = [
+    { id: 1, title: "Refurbished Wireless Earbuds", cat: "Electronics", price: 18.5,
+      seller: "@techloop", rating: 4.6, reviews: 132,
+      description: "Gently used, factory-reset wireless earbuds with 90% battery health remaining. Includes charging case and two spare ear tip sizes.",
+      image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&h=500&fit=crop&q=80" },
+    { id: 2, title: "1-Hour Logo Design Session", cat: "Services", price: 32,
+      seller: "@ana.designs", rating: 4.9, reviews: 47,
+      description: "A focused one-hour live session with a freelance brand designer. Walk away with 3 concept directions and editable source files.",
+      image: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=500&h=500&fit=crop&q=80" },
+    { id: 3, title: "Ebook: Learn Pi Development", cat: "Digital", price: 6.25,
+      seller: "@codewithkai", rating: 4.4, reviews: 88,
+      description: "A 140-page PDF guide covering the Pi SDK, smart contract basics, and shipping your first app to the ecosystem.",
+      image: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=500&h=500&fit=crop&q=80" },
+    { id: 4, title: "Handwoven Ceramic Planter", cat: "Home", price: 11,
+      seller: "@clay.and.co", rating: 4.8, reviews: 21,
+      description: "Hand-thrown stoneware planter with a matte glaze finish and drainage hole. Fits pots up to 5 inches wide.",
+      image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=500&h=500&fit=crop&q=80" },
+    { id: 5, title: "Portable Bluetooth Speaker", cat: "Electronics", price: 24.75,
+      seller: "@techloop", rating: 4.3, reviews: 205,
+      description: "Compact splash-resistant speaker with 12-hour battery life and surprisingly deep bass for its size.",
+      image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500&h=500&fit=crop&q=80" },
+    { id: 6, title: "Resume Review & Rewrite", cat: "Services", price: 15,
+      seller: "@careercoachlee", rating: 4.7, reviews: 63,
+      description: "A full pass on your resume from a former hiring manager — structure, wording, and ATS formatting included.",
+      image: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=500&h=500&fit=crop&q=80" },
+    { id: 7, title: "Lightroom Preset Bundle", cat: "Digital", price: 4.5,
+      seller: "@visualsbyro", rating: 4.5, reviews: 156,
+      description: "20 hand-tuned presets for moody, warm-toned photography. Compatible with mobile and desktop Lightroom.",
+      image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500&h=500&fit=crop&q=80" },
+    { id: 8, title: "Bamboo Kitchen Organizer Set", cat: "Home", price: 9.9,
+      seller: "@simplystocked", rating: 4.2, reviews: 39,
+      description: "Stackable bamboo trays for pantry and drawer organization. Set of 3, food-safe sealed finish.",
+      image: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500&h=500&fit=crop&q=80" },
+    { id: 9, title: "Used Mechanical Keyboard", cat: "Electronics", price: 21,
+      seller: "@keycapclub", rating: 4.1, reviews: 74,
+      description: "Hot-swappable 75% keyboard with brown switches, barely used. Comes with the original box and cable.",
+      image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500&h=500&fit=crop&q=80" },
+    { id: 10, title: "1:1 Pi Trading Mentorship", cat: "Services", price: 45,
+      seller: "@marcusW", rating: 5.0, reviews: 12,
+      description: "A 45-minute video call covering portfolio basics and how to read market cycles, tailored to beginners.",
+      image: "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=500&h=500&fit=crop&q=80" },
+    { id: 11, title: "Icon Pack — 300 Vector Icons", cat: "Digital", price: 3.2,
+      seller: "@visualsbyro", rating: 4.6, reviews: 98,
+      description: "300 outlined and filled SVG icons across 12 categories, organized in Figma and exported for web use.",
+      image: "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=500&h=500&fit=crop&q=80" },
+    { id: 12, title: "Linen Throw Pillow Cover", cat: "Home", price: 7.4,
+      seller: "@clay.and.co", rating: 4.4, reviews: 55,
+      description: "100% washed linen cover, hidden zipper closure, fits standard 18x18 inch inserts.",
+      image: "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=500&h=500&fit=crop&q=80" },
+  ];
+
+  const orders = [
+    { title: "Portable Bluetooth Speaker", status: "Shipped", price: 24.75, date: "Aug 14" },
+    { title: "1-Hour Logo Design Session", status: "In progress", price: 32, date: "Aug 12" },
+    { title: "Ebook: Learn Pi Development", status: "Delivered", price: 6.25, date: "Aug 3" },
+  ];
+
+  const activity = [
+    { label: "Sold — Icon Pack", amount: "+3.20", date: "Today" },
+    { label: "Purchase — Speaker", amount: "-24.75", date: "Aug 14" },
+    { label: "Received from @jmiles", amount: "+50.00", date: "Aug 10" },
+  ];
+
+  let balance = 1284.60;
+
+  // =====================================================================
+  // PI NETWORK SDK — init, auth, and payment checkout
+  // =====================================================================
+  let piUser = null;
+
+  // 2. Initialization — call once, before authenticate() or createPayment()
+  function initPiSdk() {
+    if (typeof Pi === 'undefined') {
+      console.warn('[Pi SDK] window.Pi not found — this preview is not running inside the Pi Browser.');
+      return;
+    }
+    Pi.init({ version: "2.0", sandbox: true }); // sandbox: false in production
+    console.log('[Pi SDK] Initialized in sandbox mode.');
+  }
+
+  // Fires if the authenticated user has a payment that was never completed
+  function onIncompletePaymentFound(payment) {
+    console.log('[Pi SDK] Incomplete payment found:', payment);
+    showSdkAlert(
+      'Unfinished Payment Found',
+      `You have a pending payment of π ${payment.amount} from a previous session. Resolve it before starting a new purchase.`,
+      'warning'
+    );
+  }
+
+  // 3. Authenticate the user, requesting the 'username' scope
+  function authenticateUser() {
+    return new Promise((resolve, reject) => {
+      if (typeof Pi === 'undefined') {
+        console.warn('[Pi SDK] Skipping authenticate() — SDK unavailable in this preview.');
+        resolve(null);
+        return;
+      }
+      const scopes = ['username'];
+      Pi.authenticate(scopes, onIncompletePaymentFound)
+        .then((auth) => {
+          console.log('[Pi SDK] Authentication success:', auth);
+          piUser = auth.user;
+          resolve(auth);
+        })
+        .catch((error) => {
+          console.error('[Pi SDK] Authentication error:', error);
+          showSdkAlert('Sign-in Failed', "We couldn't verify your Pi account. Please try again.", 'error');
+          reject(error);
+        });
+    });
+  }
+
+  // 4. createPayment — standard Pi SDK payment schema
+  function createPiPayment(product) {
+    const paymentData = {
+      amount: product.price,                                       // Dynamic item price
+      memo: `Purchase of ${product.title} from Marketplace`,       // Shown to the user
+      metadata: { productId: product.id },                          // Your own reference data
+    };
+
+    // 5. Placeholder callbacks — log to console + surface a user-facing alert modal
+    const paymentCallbacks = {
+      onReadyForServerApproval: function (paymentId) {
+        console.log('[Pi SDK] onReadyForServerApproval:', paymentId);
+        showSdkAlert(
+          'Approval Requested',
+          `Payment ${paymentId} is waiting for your server to approve it.\n\nTODO: POST this paymentId to your backend's /payments/approve endpoint.`,
+          'info'
+        );
+      },
+      onReadyForServerCompletion: function (paymentId, txid) {
+        console.log('[Pi SDK] onReadyForServerCompletion:', paymentId, txid);
+        showSdkAlert(
+          'Payment Complete',
+          `Transaction ${txid} was confirmed on the Pi blockchain.\n\nTODO: POST paymentId + txid to your backend's /payments/complete endpoint.`,
+          'success'
+        );
+        finalizePurchase(product);
+      },
+      onCancel: function (paymentId) {
+        console.log('[Pi SDK] onCancel:', paymentId);
+        showSdkAlert('Payment Cancelled', `Payment ${paymentId} was cancelled before it completed.`, 'warning');
+      },
+      onError: function (error, payment) {
+        console.error('[Pi SDK] onError:', error, payment);
+        showSdkAlert('Payment Error', (error && error.message) || 'Something went wrong while processing this payment.', 'error');
+      },
+    };
+
+    if (typeof Pi === 'undefined' || !window.Pi || typeof window.Pi.createPayment !== 'function') {
+      console.warn('[Pi SDK] createPayment unavailable — simulating the callback lifecycle for preview purposes.');
+      showSdkAlert(
+        'Pi SDK Unavailable',
+        "This preview isn't running inside the Pi Browser, so the payment is simulated below. Open this app in the Pi Browser to pay with real Pi.",
+        'warning'
+      );
+      simulatePiPaymentLifecycle(paymentCallbacks);
+      return;
+    }
+
+    Pi.createPayment(paymentData, paymentCallbacks);
+  }
+
+  // Demo-only stand-in for the Pi Browser's native callback sequence,
+  // so Buy Now is fully clickable in a normal browser preview.
+  function simulatePiPaymentLifecycle(callbacks) {
+    const fakePaymentId = 'sandbox_' + Math.random().toString(36).slice(2, 10);
+    const fakeTxid = 'txid_' + Math.random().toString(36).slice(2, 10);
+    setTimeout(() => callbacks.onReadyForServerApproval(fakePaymentId), 500);
+    setTimeout(() => callbacks.onReadyForServerCompletion(fakePaymentId, fakeTxid), 1300);
+  }
+
+  // Records a completed Pi payment into orders/activity/balance
+  function finalizePurchase(product) {
+    orders.unshift({ title: product.title, status: "In progress", price: product.price, date: "Today" });
+    activity.unshift({ label: `Purchase — ${product.title}`, amount: `-${product.price.toFixed(2)}`, date: "Today" });
+    balance -= product.price;
+    renderOrders();
+    renderWallet();
+    goToPage('orders');
+  }
+
+  // On-screen alert modal (separate from the toast) for SDK lifecycle events
+  function showSdkAlert(title, message, variant = 'info') {
+    const styles = {
+      info: { wrap: 'bg-pipurple-50 text-pipurple-700', icon: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/>' },
+      success: { wrap: 'bg-green-50 text-green-600', icon: '<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>' },
+      warning: { wrap: 'bg-pigold-500/20 text-pigold-600', icon: '<path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/>' },
+      error: { wrap: 'bg-red-50 text-red-600', icon: '<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6" stroke-linecap="round"/>' },
+    };
+    const s = styles[variant] || styles.info;
+    const iconEl = document.getElementById('sdkAlertIcon');
+    iconEl.className = `w-10 h-10 rounded-full flex items-center justify-center mb-3 ${s.wrap}`;
+    iconEl.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${s.icon}</svg>`;
+    document.getElementById('sdkAlertTitle').textContent = title;
+    document.getElementById('sdkAlertMessage').textContent = message;
+    document.getElementById('sdkAlertModal').classList.remove('hidden');
+  }
+
+  function closeSdkAlert() {
+    document.getElementById('sdkAlertModal').classList.add('hidden');
+  }
+
+  document.getElementById('sdkAlertClose').addEventListener('click', closeSdkAlert);
+  document.getElementById('sdkAlertBackdrop').addEventListener('click', closeSdkAlert);
+
+  // =====================================================================
+  // CART — localStorage-backed
+  // =====================================================================
+  const CART_KEY = 'piMarket.cart';
+
+  function loadCart() {
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCart(cart) {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  }
+
+  let cart = loadCart(); // [{ id, qty }]
+
+  function addToCart(id, qty = 1) {
+    const existing = cart.find(c => c.id === id);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      cart.push({ id, qty });
+    }
+    saveCart(cart);
+    renderCart();
+  }
+
+  function removeFromCart(id) {
+    cart = cart.filter(c => c.id !== id);
+    saveCart(cart);
+    renderCart();
+  }
+
+  function setCartQty(id, qty) {
+    const item = cart.find(c => c.id === id);
+    if (!item) return;
+    if (qty <= 0) {
+      removeFromCart(id);
+      return;
+    }
+    item.qty = qty;
+    saveCart(cart);
+    renderCart();
+  }
+
+  function cartLines() {
+    return cart
+      .map(c => ({ ...c, product: products.find(p => p.id === c.id) }))
+      .filter(l => l.product);
+  }
+
+  function cartTotal() {
+    return cartLines().reduce((sum, l) => sum + l.product.price * l.qty, 0);
+  }
+
+  function cartCount() {
+    return cart.reduce((sum, c) => sum + c.qty, 0);
+  }
+
+  // =====================================================================
+  // 3. SEARCH + RENDER PRODUCT GRID
+  // =====================================================================
+  const grid = document.getElementById('productGrid');
+  const emptyState = document.getElementById('emptyState');
+  const resultCount = document.getElementById('resultCount');
+  let activeCat = 'All';
+  let query = '';
+
+  function ratingStars(rating) {
+    return `<svg width="12" height="12" viewBox="0 0 24 24" fill="#E5A93C" class="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>`;
+  }
+
+  function filterProducts() {
+    const q = query.trim().toLowerCase();
+    return products.filter(p => {
+      const matchesCat = activeCat === 'All' || p.cat === activeCat;
+      const matchesQuery = !q ||
+        p.title.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.seller.toLowerCase().includes(q) ||
+        p.cat.toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    });
+  }
+
+  // 2. Dynamic render function for the product grid
+  function renderProducts() {
+    const filtered = filterProducts();
+
+    resultCount.textContent = `${filtered.length} item${filtered.length !== 1 ? 's' : ''}`;
+    grid.innerHTML = '';
+    emptyState.classList.toggle('hidden', filtered.length !== 0);
+
+    filtered.forEach(p => {
+      const card = document.createElement('article');
+      card.dataset.id = p.id;
+      card.className = "bg-white border border-pipurple-100 rounded-2xl overflow-hidden flex flex-col hover:border-pigold-500 transition cursor-pointer";
+
+      const imageBlock = p.image
+        ? `<img src="${p.image}" alt="${p.title}" loading="lazy" class="w-full h-full object-cover"
+               onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')" />
+           <div class="hidden absolute inset-0 pi-watermark bg-gradient-to-br from-pipurple-50 to-pigold-300/10"></div>`
+        : `<div class="absolute inset-0 pi-watermark bg-gradient-to-br from-pipurple-50 to-pigold-300/10"></div>`;
+
+      const ratingBlock = p.reviews > 0
+        ? `${ratingStars(p.rating)}
+           <span class="font-medium text-pipurple-700">${p.rating}</span>
+           <span>(${p.reviews})</span>`
+        : `<span class="text-[11px] font-semibold text-pigold-600 uppercase tracking-wide">New listing</span>`;
+
+      card.innerHTML = `
+        <div class="relative aspect-square bg-pipurple-50 overflow-hidden">
+          ${imageBlock}
+        </div>
+        <div class="p-2.5 flex flex-col gap-1.5 flex-1">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-pigold-600">${p.cat}</p>
+          <h3 class="text-sm font-medium leading-snug line-clamp-2 text-pipurple-900">${p.title}</h3>
+          <div class="flex items-center gap-1 text-[11px] text-pipurple-300">
+            ${ratingBlock}
+          </div>
+          <div class="flex items-center gap-1 mt-auto pt-1">
+            <span class="w-5 h-5 rounded-full bg-pigold-500 text-pipurple-900 font-display font-bold text-[11px] flex items-center justify-center shrink-0">π</span>
+            <span class="font-display font-bold text-sm text-pipurple-900">${p.price.toFixed(2)}</span>
+          </div>
+        </div>
+      `;
+      card.addEventListener('click', () => openModal(p.id));
+      grid.appendChild(card);
+    });
+  }
+
+  // =====================================================================
+  // 4. PRODUCT DETAIL MODAL
+  // =====================================================================
+  const modal = document.getElementById('productModal');
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  let currentProductId = null;
+
+  function initials(name) {
+    return name.replace('@', '').slice(0, 2).toUpperCase();
+  }
+
+  function openModal(id) {
+    const p = products.find(x => x.id === id);
+    if (!p) return;
+    currentProductId = id;
+
+    document.getElementById('modalImage').src = p.image || '';
+    document.getElementById('modalImage').style.display = p.image ? 'block' : 'none';
+    document.getElementById('modalImageFallback').classList.toggle('hidden', !!p.image);
+    document.getElementById('modalImage').setAttribute('onerror',
+      "this.style.display='none'; document.getElementById('modalImageFallback').classList.remove('hidden')");
+    document.getElementById('modalCategory').textContent = p.cat;
+    document.getElementById('modalTitle').textContent = p.title;
+    document.getElementById('modalSeller').textContent = `Sold by ${p.seller}`;
+    document.getElementById('modalSellerAvatar').textContent = initials(p.seller);
+    document.getElementById('modalDescription').textContent = p.description;
+    document.getElementById('modalPrice').textContent = p.price.toFixed(2);
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  }
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    currentProductId = null;
+  }
+
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', closeModal);
+
+  document.getElementById('modalAddToCart').addEventListener('click', () => {
+    if (currentProductId == null) return;
+    addToCart(currentProductId, 1);
+    showToast('Added to cart');
+  });
+
+  document.getElementById('modalBuyNow').addEventListener('click', () => {
+    if (currentProductId == null) return;
+    const product = products.find(p => p.id === currentProductId);
+    if (!product) return;
+    closeModal();
+    authenticateUser()
+      .then(() => createPiPayment(product))
+      .catch((err) => console.log('[Pi SDK] Buy Now aborted:', err && err.message));
+  });
+
+  // =====================================================================
+  // TOAST
+  // =====================================================================
+  let toastTimer = null;
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    requestAnimationFrame(() => { toast.style.opacity = '1'; });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.classList.add('hidden'), 200);
+    }, 1600);
+  }
+
+  // =====================================================================
+  // 5. CART RENDER — Wallet/Cart tab
+  // =====================================================================
+  function renderCart() {
+    const list = document.getElementById('cartList');
+    const empty = document.getElementById('cartEmpty');
+    const summary = document.getElementById('cartSummary');
+    const countLabel = document.getElementById('cartCountLabel');
+    const totalEl = document.getElementById('cartTotal');
+    const badge = document.getElementById('cartBadge');
+
+    const lines = cartLines();
+    const count = cartCount();
+    const total = cartTotal();
+
+    countLabel.textContent = count > 0 ? `${count} item${count !== 1 ? 's' : ''}` : '';
+    badge.textContent = count;
+    badge.classList.toggle('hidden', count === 0);
+
+    if (lines.length === 0) {
+      list.innerHTML = '';
+      empty.classList.remove('hidden');
+      summary.classList.add('hidden');
+      return;
+    }
+
+    empty.classList.add('hidden');
+    summary.classList.remove('hidden');
+    totalEl.textContent = `π ${total.toFixed(2)}`;
+
+    list.innerHTML = lines.map(l => `
+      <div class="flex items-center gap-3 border border-pipurple-100 rounded-xl p-2.5">
+        <div class="relative w-14 h-14 rounded-lg overflow-hidden bg-pipurple-50 shrink-0">
+          <img src="${l.product.image}" alt="${l.product.title}" class="w-full h-full object-cover"
+               onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')" />
+          <div class="hidden absolute inset-0 pi-watermark bg-gradient-to-br from-pipurple-50 to-pigold-300/10"></div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-pipurple-900 truncate">${l.product.title}</p>
+          <p class="text-xs text-pipurple-300 mb-1.5">π ${l.product.price.toFixed(2)} each</p>
+          <div class="flex items-center gap-2">
+            <button class="qty-btn w-6 h-6 rounded-full border border-pipurple-200 text-pipurple-700 text-sm leading-none flex items-center justify-center" data-id="${l.id}" data-delta="-1">–</button>
+            <span class="text-xs font-medium w-4 text-center">${l.qty}</span>
+            <button class="qty-btn w-6 h-6 rounded-full border border-pipurple-200 text-pipurple-700 text-sm leading-none flex items-center justify-center" data-id="${l.id}" data-delta="1">+</button>
+          </div>
+        </div>
+        <div class="flex flex-col items-end justify-between self-stretch shrink-0">
+          <button class="remove-btn text-pipurple-300 hover:text-pipurple-700" data-id="${l.id}" aria-label="Remove item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+          <p class="font-display font-semibold text-sm text-pipurple-900">π ${(l.product.price * l.qty).toFixed(2)}</p>
+        </div>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.qty-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.id);
+        const delta = Number(btn.dataset.delta);
+        const item = cart.find(c => c.id === id);
+        if (item) setCartQty(id, item.qty + delta);
+      });
+    });
+
+    list.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.id)));
+    });
+  }
+
+  document.getElementById('checkoutBtn').addEventListener('click', () => {
+    const total = cartTotal();
+    if (total <= 0) return;
+    if (total > balance) {
+      showToast("Not enough Pi to complete checkout");
+      return;
+    }
+    cartLines().forEach(l => {
+      orders.unshift({ title: l.product.title, status: "In progress", price: l.product.price * l.qty, date: "Today" });
+      activity.unshift({ label: `Purchase — ${l.product.title}`, amount: `-${(l.product.price * l.qty).toFixed(2)}`, date: "Today" });
+    });
+    balance -= total;
+    cart = [];
+    saveCart(cart);
+    renderCart();
+    renderOrders();
+    renderWallet();
+    showToast('Order placed');
+    goToPage('orders');
+  });
+
+  // =====================================================================
+  // ORDERS + WALLET RENDER
+  // =====================================================================
+  function renderOrders() {
+    const list = document.getElementById('ordersList');
+    const statusColor = {
+      "Shipped": "bg-pigold-500/20 text-pigold-600",
+      "In progress": "bg-pipurple-100 text-pipurple-700",
+      "Delivered": "bg-green-100 text-green-700",
+    };
+    list.innerHTML = orders.map(o => `
+      <div class="flex items-center gap-3 border border-pipurple-100 rounded-xl p-3">
+        <div class="w-12 h-12 rounded-lg bg-pipurple-50 relative pi-watermark shrink-0"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-pipurple-900 truncate">${o.title}</p>
+          <p class="text-xs text-pipurple-300">${o.date}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="font-display font-semibold text-sm text-pipurple-900">π ${o.price.toFixed(2)}</p>
+          <span class="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor[o.status]}">${o.status}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderWallet() {
+    document.getElementById('walletBalance').textContent = `π ${balance.toFixed(2)}`;
+    const list = document.getElementById('walletActivity');
+    list.innerHTML = activity.map(a => `
+      <div class="flex items-center justify-between border border-pipurple-100 rounded-xl px-3.5 py-3">
+        <div>
+          <p class="text-sm font-medium text-pipurple-900">${a.label}</p>
+          <p class="text-xs text-pipurple-300">${a.date}</p>
+        </div>
+        <p class="font-display font-semibold text-sm ${a.amount.startsWith('+') ? 'text-green-600' : 'text-pipurple-900'}">${a.amount} π</p>
+      </div>
+    `).join('');
+  }
+
+  // =====================================================================
+  // SELL ITEM — form validation + create listing
+  // =====================================================================
+  const sellForm = document.getElementById('sellForm');
+  const sellTitle = document.getElementById('sellTitle');
+  const sellCategory = document.getElementById('sellCategory');
+  const sellPrice = document.getElementById('sellPrice');
+  const sellDescription = document.getElementById('sellDescription');
+  const sellImageInput = document.getElementById('sellImage');
+  const sellImageTrigger = document.getElementById('sellImageTrigger');
+  const sellTitleError = document.getElementById('sellTitleError');
+  const sellPriceError = document.getElementById('sellPriceError');
+
+  const sellImagePlaceholder = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m4 17 5-5 3 3 4-4 4 4"/>
+    </svg>
+    <span>Tap to add a photo</span>
+  `;
+  let sellImageDataUrl = '';
+
+  sellImageTrigger.addEventListener('click', () => sellImageInput.click());
+
+  sellImageInput.addEventListener('change', () => {
+    const file = sellImageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      sellImageDataUrl = e.target.result;
+      sellImageTrigger.innerHTML = `
+        <img src="${sellImageDataUrl}" alt="Selected photo preview" class="w-full h-32 object-cover rounded-lg mb-1.5" />
+        <span class="text-xs text-pipurple-700 font-medium">Tap to change photo</span>
+      `;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function setFieldError(input, errorEl, hasError) {
+    errorEl.classList.toggle('hidden', !hasError);
+    input.classList.toggle('border-red-400', hasError);
+    input.classList.toggle('focus:ring-red-200', hasError);
+    input.classList.toggle('border-pipurple-100', !hasError);
+  }
+
+  // 3. Validation: title >= 5 characters, price > 0
+  function validateSellForm() {
+    let valid = true;
+
+    const titleVal = sellTitle.value.trim();
+    const titleValid = titleVal.length >= 5;
+    setFieldError(sellTitle, sellTitleError, !titleValid);
+    if (!titleValid) valid = false;
+
+    const priceVal = parseFloat(sellPrice.value);
+    const priceValid = !isNaN(priceVal) && priceVal > 0;
+    setFieldError(sellPrice, sellPriceError, !priceValid);
+    if (!priceValid) valid = false;
+
+    return valid;
+  }
+
+  // Clear errors live as the person fixes each field
+  sellTitle.addEventListener('input', () => {
+    if (sellTitle.value.trim().length >= 5) setFieldError(sellTitle, sellTitleError, false);
+  });
+  sellPrice.addEventListener('input', () => {
+    const v = parseFloat(sellPrice.value);
+    if (!isNaN(v) && v > 0) setFieldError(sellPrice, sellPriceError, false);
+  });
+
+  function resetSellForm() {
+    sellForm.reset();
+    sellImageDataUrl = '';
+    sellImageInput.value = '';
+    sellImageTrigger.innerHTML = sellImagePlaceholder;
+    setFieldError(sellTitle, sellTitleError, false);
+    setFieldError(sellPrice, sellPriceError, false);
+  }
+
+  // Resets search + category filters so a fresh listing is always visible on Home
+  function clearHomeFilters() {
+    query = '';
+    activeCat = 'All';
+    document.getElementById('searchInput').value = '';
+    document.querySelectorAll('#pillRow .pill').forEach(b => {
+      const isAll = b.dataset.cat === 'All';
+      b.classList.toggle('bg-pipurple-700', isAll);
+      b.classList.toggle('text-white', isAll);
+      b.classList.toggle('border', !isAll);
+      b.classList.toggle('border-pipurple-200', !isAll);
+      b.classList.toggle('text-pipurple-700', !isAll);
+    });
+  }
+
+  // 4. Submit handler: validate, build the new product object, append it, and jump to Home
+  sellForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!validateSellForm()) return;
+
+    const newProduct = {
+      id: products.reduce((max, p) => Math.max(max, p.id), 0) + 1,
+      title: sellTitle.value.trim(),
+      cat: sellCategory.value,
+      price: parseFloat(sellPrice.value),
+      seller: piUser && piUser.username ? `@${piUser.username}` : '@you',
+      rating: 0,
+      reviews: 0,
+      description: sellDescription.value.trim() || 'No description provided.',
+      image: sellImageDataUrl,
+    };
+
+    products.unshift(newProduct);
+
+    clearHomeFilters();
+    renderProducts();
+    resetSellForm();
+    goToPage('home');
+    showToast('Listing published!');
+  });
+
+  // =====================================================================
+  // EVENTS: search + category pills
+  // =====================================================================
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    query = e.target.value;
+    renderProducts();
+  });
+
+  document.querySelectorAll('#pillRow .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#pillRow .pill').forEach(b => {
+        b.classList.remove('bg-pipurple-700', 'text-white');
+        b.classList.add('border', 'border-pipurple-200', 'text-pipurple-700');
+      });
+      btn.classList.remove('border', 'border-pipurple-200', 'text-pipurple-700');
+      btn.classList.add('bg-pipurple-700', 'text-white');
+      activeCat = btn.dataset.cat;
+      renderProducts();
+    });
+  });
+
+  // =====================================================================
+  // EVENTS: bottom nav tab switching
+  // =====================================================================
+  function goToPage(pageName) {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      const active = b.dataset.page === pageName;
+      b.classList.toggle('active', active);
+      b.classList.toggle('text-pipurple-700', active);
+      b.classList.toggle('text-pipurple-300', !active);
+    });
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + pageName).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => goToPage(btn.dataset.page));
+  });
+
+  // =====================================================================
+  // INIT
+  // =====================================================================
+  initPiSdk();
+  renderProducts();
+  renderOrders();
+  renderWallet();
+  renderCart();
+</script>
+
+</body>
+</html>
